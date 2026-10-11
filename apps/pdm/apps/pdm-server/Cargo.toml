@@ -1,0 +1,27 @@
+[package]
+name = "pdm-server"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+pdm-core = { workspace = true }
+pdm-db = { workspace = true }
+pdm-storage = { workspace = true }
+pdm-api = { workspace = true }
+pdm-worker = { workspace = true }
+pdm-mcp = { workspace = true }
+pdm-erp = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+sqlx = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+reqwest = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }

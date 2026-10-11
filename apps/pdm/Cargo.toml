@@ -1,0 +1,84 @@
+# PDM platform — its own Cargo workspace.
+#
+# Kept separate from the CAD workspace (the repo root) so that the heavy
+# service dependencies (axum, tokio, sqlx, object_store, ...) do not enter the
+# CAD kernel's dependency graph and so the CAD side stays wasm-buildable.
+# The CAD workspace excludes this directory (see root Cargo.toml).
+#
+# The PDM server treats the `.solvecraft` design as an opaque, content-addressed,
+# immutable blob and inspects it only by shelling out to `solvecraft-cli`.
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.90"
+authors = ["SolveCraft contributors"]
+repository = "https://github.com/bherbruck/solvecraft"
+
+[workspace.dependencies]
+# internal
+pdm-core = { path = "crates/pdm-core" }
+pdm-db = { path = "crates/pdm-db" }
+pdm-storage = { path = "crates/pdm-storage" }
+pdm-api = { path = "crates/pdm-api" }
+pdm-worker = { path = "crates/pdm-worker" }
+pdm-mcp = { path = "crates/pdm-mcp" }
+pdm-erp = { path = "crates/pdm-erp" }
+
+# async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "process", "fs", "io-util", "time", "sync"] }
+
+# http
+axum = { version = "0.8", features = ["multipart"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "set-header", "fs"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+hyper = { version = "1", features = ["server", "http1", "client"] }
+http = "1"
+http-body-util = "0.1"
+bytes = "1"
+futures = "0.3"
+
+# database
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json", "derive", "migrate"] }
+
+# object storage
+object_store = { version = "0.12", features = ["aws"] }
+
+# serialization / ids / time
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# crypto
+sha2 = "0.10"
+hex = "0.4"
+argon2 = "0.5"
+rand = "0.9"
+jsonwebtoken = { version = "9", features = ["ring"] }
+
+# errors / logging
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# cli
+clap = { version = "4", features = ["derive"] }
+
+# profile
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+debug = 0

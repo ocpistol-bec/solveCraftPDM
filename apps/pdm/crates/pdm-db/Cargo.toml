@@ -1,0 +1,17 @@
+[package]
+name = "pdm-db"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+pdm-core = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

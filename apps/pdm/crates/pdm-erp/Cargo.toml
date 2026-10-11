@@ -1,0 +1,15 @@
+[package]
+name = "pdm-erp"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+pdm-core = { workspace = true }
+pdm-db = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
