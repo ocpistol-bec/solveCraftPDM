@@ -1,5 +1,6 @@
 /target*/
 /plan/
+/apps/pdm/target/
 /dist/
 *~
 .DS_Store

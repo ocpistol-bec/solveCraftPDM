@@ -1,0 +1,18 @@
+[package]
+name = "solvecraft-pdm-client"
+description = "PDM vault client: talks to the SolveCraft PDM server (checkout/checkin, versions, search) and manages a local offline workspace"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }

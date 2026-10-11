@@ -41,6 +41,9 @@ pub const TABLE: &[(&str, Class)] = &[
     ("render", Class::Layer(1)),
     ("doc", Class::Layer(2)),
     ("io", Class::Layer(3)),
+    // PDM vault client: HTTP client + local workspace cache. Below engine so the
+    // engine's `pdm.*` commands can call it.
+    ("pdm-client", Class::Layer(3)),
     ("engine", Class::Layer(4)),
     ("ui-egui", Class::Layer(5)),
     ("mcp", Class::Layer(5)),

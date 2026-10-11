@@ -1594,6 +1594,11 @@ pub struct Document {
     #[serde(default = "default_format")]
     pub format: String,
     pub name: String,
+    /// Stable identity of this document (PDM cross-document references). Legacy files
+    /// without it are assigned one on load (see `crate::format::v5_to_v6`); it is ignored
+    /// in local-file mode.
+    #[serde(default = "default_doc_id")]
+    pub doc_id: uuid::Uuid,
     #[serde(default = "default_units")]
     pub units: String,
     pub params: Vec<Param>,
@@ -1689,6 +1694,9 @@ fn default_format() -> String {
 fn default_units() -> String {
     "mm".into()
 }
+fn default_doc_id() -> uuid::Uuid {
+    uuid::Uuid::nil()
+}
 
 impl Default for Document {
     fn default() -> Self {
@@ -1701,6 +1709,7 @@ impl Document {
         Document {
             format: default_format(),
             name: name.into(),
+            doc_id: uuid::Uuid::new_v4(),
             units: default_units(),
             params: Vec::new(),
             features: Vec::new(),

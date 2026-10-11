@@ -20,6 +20,8 @@
 //!   "don't mate". Older joints keep their placement: their `flip` is inverted.
 //! - 6: XZ origin planes use sketch y = -Z and normal +Y. Older XZ references become
 //!   explicit planes retaining their previous axes, including offset-plane expressions.
+//!   Stable document-level identity (`doc_id` UUID) for PDM cross-document references;
+//!   legacy designs without one are assigned on load.
 //! - 7: configuration tables can include body material and appearance columns. Version 6
 //!   rows need no transformation; the version stamp lets older readers request an update
 //!   instead of encountering an unknown column variant.
@@ -58,9 +60,14 @@ type JsonStep = fn(&mut Value) -> Result<()>;
 const JSON_STEPS: [JsonStep; 11] =
     [|_| Ok(()), v2_to_v3, v3_to_v4, v4_to_v5, v5_to_v6, |_| Ok(()), |_| Ok(()), |_| Ok(()), |_| Ok(()), |_| Ok(()), |_| Ok(())];
 
-/// Old XZ references retain their exact frame, including nested offset and angled planes.
-/// New origin references use +Y; freezing the old frame avoids changing sketch coordinates,
-/// dimensions, profiles, extrude directions or parameter expressions in saved designs.
+/// v5 -> v6: two independent changes, applied to every v5 file on load.
+///
+/// 1. Old XZ references retain their exact frame, including nested offset and angled
+///    planes. New origin references use +Y; freezing the old frame avoids changing sketch
+///    coordinates, dimensions, profiles, extrude directions or parameter expressions in
+///    saved designs.
+/// 2. A stable document identity (`doc_id`) is assigned to designs that predate it, so PDM
+///    can reference documents across files; re-loading a file preserves the assigned id.
 fn v5_to_v6(v: &mut Value) -> Result<()> {
     fn preserve(v: &mut Value) {
         match v {
@@ -78,6 +85,15 @@ fn v5_to_v6(v: &mut Value) -> Result<()> {
         }
     }
     preserve(v);
+
+    const NIL: &str = "00000000-0000-0000-0000-000000000000";
+    let needs_id = match v.get("doc_id").and_then(Value::as_str) {
+        None => true,
+        Some(s) => s.is_empty() || s == NIL,
+    };
+    if needs_id && let Some(obj) = v.as_object_mut() {
+        obj.insert("doc_id".into(), Value::String(uuid::Uuid::new_v4().to_string()));
+    }
     Ok(())
 }
 
@@ -210,6 +226,10 @@ pub fn read(s: &str) -> Result<Document> {
     // Fill in what older designs (and hand-edited files) may lack; a no-op otherwise.
     crate::format_offsets::validate_typed(&d)?;
     normalise(&mut d)?;
+    // A stable document identity is required by PDM; assign one if a file lacked it.
+    if d.doc_id.is_nil() {
+        d.doc_id = uuid::Uuid::new_v4();
+    }
     d.format = format_string(FORMAT);
     Ok(d)
 }
@@ -1188,6 +1208,29 @@ mod tests {
         assert_eq!(read(&migrated.to_json()).unwrap(), migrated);
         let fresh = doc.resolve_plane(&values, &crate::PlaneRef::Origin { name: "XZ".into() }, 0).unwrap();
         assert_eq!(fresh.normal(), solvecraft_geom::Vec3::Y);
+    }
+
+    #[test]
+    fn doc_id_identity() {
+        // New documents carry a stable, non-nil identity.
+        let d = Document::new("A");
+        assert!(!d.doc_id.is_nil(), "fresh documents must have a doc_id");
+        // A v5 legacy file without doc_id gets one assigned on load.
+        let mut old: Value = serde_json::from_str(&d.to_json()).unwrap();
+        old["format"] = Value::from("solvecraft/5");
+        old.as_object_mut().unwrap().remove("doc_id");
+        let loaded = read(&old.to_string()).unwrap();
+        assert!(!loaded.doc_id.is_nil(), "legacy load must assign a doc_id");
+        assert_eq!(loaded.format, format_string(FORMAT));
+        // Re-saving a current-format document preserves the identity.
+        let saved: Value = serde_json::from_str(&loaded.to_json()).unwrap();
+        let reloaded = read(&saved.to_string()).unwrap();
+        assert_eq!(reloaded.doc_id, loaded.doc_id, "doc_id must survive save/load");
+        // A nil doc_id on a current-format file is also filled in.
+        let mut nilled: Value = serde_json::from_str(&d.to_json()).unwrap();
+        nilled["doc_id"] = Value::from("00000000-0000-0000-0000-000000000000");
+        let filled = read(&nilled.to_string()).unwrap();
+        assert!(!filled.doc_id.is_nil(), "nil doc_id must be filled on load");
     }
 
     #[test]

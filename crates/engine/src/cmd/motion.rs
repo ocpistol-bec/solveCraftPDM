@@ -188,6 +188,7 @@ fn deepest(a: &solvecraft_geom::Mesh, b: &solvecraft_geom::Mesh, tol: f64) -> f6
 }
 
 /// Ray parity along a skew direction (no axis-aligned edge hits).
+#[allow(clippy::approx_constant)] // 0.5772… is a skew ray slope, not Euler's γ
 fn inside(p: Vec3, tris: &[[Vec3; 3]]) -> bool {
     // Fixed ray coordinates, not an approximation used to compute Euler's constant.
     #[allow(clippy::approx_constant)]

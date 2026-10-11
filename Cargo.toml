@@ -2,7 +2,9 @@
 resolver = "3"
 members = ["crates/*", "apps/*", "xtask"]
 # Third-party code kept with local fixes (see vendor/README.md); not linted as ours.
-exclude = ["vendor"]
+# `apps/pdm` is the PDM platform: its own nested Cargo workspace (axum/tokio/sqlx),
+# excluded here so the CAD kernel stays lean and wasm-buildable. See apps/pdm/.
+exclude = ["vendor", "apps/pdm"]
 
 [workspace.package]
 version = "0.2.0"
@@ -23,6 +25,7 @@ solvecraft-io = { path = "crates/io" }
 solvecraft-engine = { path = "crates/engine" }
 solvecraft-ui-egui = { path = "crates/ui-egui" }
 solvecraft-mcp = { path = "crates/mcp" }
+solvecraft-pdm-client = { path = "crates/pdm-client" }
 
 # foundation
 thiserror = "2"
@@ -30,6 +33,7 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 log = "0.4"
 sha2 = "0.10"
+uuid = { version = "1", features = ["v4", "serde", "js"] }
 
 # geometry kernel (Apache-2.0; see plan/adr/0001-geometry-kernel.md). Only crates/kernel uses it.
 truck-modeling = "0.6"
@@ -47,6 +51,10 @@ ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
 
 # images
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+# PDM vault client (crates/pdm-client)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+hex = "0.4"
 
 # ui
 egui = "0.36"
