@@ -255,3 +255,22 @@ headline counts in-scope tabs only and lists the deferred ones separately.
 
 truck (Apache-2.0) behind our own `kernel` crate, with our own blend operation and boolean
 retry/validation; see `plan/adr/0001-geometry-kernel.md` (local) — summary in README.
+
+## PDM (Product Data Management)
+
+A self-hosted PDM platform under [`apps/pdm/`](apps/pdm/) (its own nested Cargo workspace,
+excluded from the CAD build so the kernel stays lean and wasm-clean). Spec:
+`apps/pdm/toDo.txt`; architecture: `docs/architecture/` (audit, integration points, gap analysis,
+system design, roadmap); live tracker: `apps/pdm/STATUS.md`.
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| P1 | Minimum functional vault: auth, projects/folders, upload/download, immutable versions, metadata, search, web file browser, audit; `Document.doc_id` in the CAD doc model | done (2026-10-09) — E2E acceptance test green |
+| P2 | Native CAD integration: `pdm-client` crate, `pdm.*` engine commands, PDM UI panel, offline workspace | planned |
+| P3 | Assemblies & dependencies: `pdm://` refs, where-used/uses, EBOM engine, BOM snapshots | planned |
+| P4 | Engineering release control: lifecycle, revisions, approvals, ECR/ECO/ECN | planned |
+| P5 | Automation & ERP: worker exports/previews, PDM MCP tools, Odoo outbox connector | planned |
+| P6 | Advanced: offline sync hardening, model compare, drawings, reporting, DR | planned |
+
+Reproducible Phase-1 acceptance test: `apps/pdm/e2e.sh` (boots Postgres via compose, migrates,
+bootstraps, serves on :18080, runs `e2e_vault`).

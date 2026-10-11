@@ -1,0 +1,1218 @@
+# Project: SolveCraft PDM
+## Enterprise-Grade Product Data Management System for SolveCraft CAD
+
+### 1. Project Objective
+
+Design and implement a complete, self-hosted Product Data Management (PDM) platform integrated with the open-source SolveCraft CAD application.
+
+Source repository:
+https://github.com/bherbruck/solvecraft
+
+The long-term objective is to provide functionality comparable to Autodesk Vault Professional, SOLIDWORKS PDM, and the engineering data management capabilities of Fusion 360.
+
+The system must support individual engineers, engineering teams, manufacturers, and organizations operating across multiple locations.
+
+**Primary requirements:**
+
+- Native integration with SolveCraft.
+- Rust-first backend architecture.
+- Cross-platform desktop compatibility.
+- Self-hosted deployment using Docker containers.
+- PostgreSQL for relational metadata.
+- S3-compatible object storage for CAD files.
+- Multi-user access with granular permissions.
+- Centralized CAD file management.
+- Version and revision control.
+- File checkout, check-in, and locking.
+- Assembly and component relationship tracking.
+- Engineering bills of materials (EBOM).
+- Engineering change management (ECR/ECO/ECN).
+- Automated STEP, STL, PDF, and drawing generation where supported.
+- Browser-based administration and file access.
+- Offline-capable CAD workflows.
+- REST APIs and event-driven integration.
+- Odoo ERP integration.
+- AI agent automation through MCP.
+- Complete audit trails.
+- Horizontal scaling and distributed workers.
+
+The system must be designed for production use, not as a demonstration.
+
+Do not attempt to implement every feature simultaneously. Establish reliable foundations and complete each phase before introducing additional complexity.
+
+---
+
+### 2. Mandatory Repository Investigation
+
+Before writing production code, inspect the entire SolveCraft repository.
+
+Review:
+
+- Cargo workspace and crate structure.
+- Native document serialization.
+- `.solvecraft` file schema.
+- Document and component identifiers.
+- Assembly and reference capabilities.
+- Command registry and engine architecture.
+- Existing file open/save mechanisms.
+- STEP assembly import/export.
+- Desktop egui integration.
+- Browser application architecture.
+- MCP integration.
+- Headless CLI functionality.
+- Existing tests and CI workflows.
+- Licensing and contribution requirements.
+
+Determine which features actually exist and which are incomplete.
+
+Do not assume that STEP assembly support implies fully functional native parametric assembly management.
+
+Produce these initial documents:
+
+1. `docs/architecture/repository-audit.md`
+2. `docs/architecture/pdm-integration-points.md`
+3. `docs/architecture/gap-analysis.md`
+4. `docs/architecture/system-design.md`
+5. `docs/architecture/implementation-roadmap.md`
+
+Document relevant existing functions, structs, traits, commands, and source locations.
+
+Prefer extending existing abstractions rather than duplicating functionality.
+
+Preserve backward compatibility with existing SolveCraft designs.
+
+---
+
+### 3. Technology Stack
+
+#### Backend
+
+- Rust, using stable supported toolchains.
+- Axum for HTTP APIs.
+- Tokio for asynchronous execution.
+- SQLx for PostgreSQL access and migrations.
+- Serde for serialization.
+- UUIDs for internal object identity.
+- OpenAPI 3.1 for API documentation.
+- Structured tracing and OpenTelemetry.
+- Configurable authentication using OpenID Connect.
+- Argon2id for any locally managed passwords.
+
+#### Database
+
+PostgreSQL is the authoritative relational database.
+
+Use transactions, foreign keys, unique constraints, optimistic concurrency, and appropriate indexes.
+
+Do not store large CAD binaries directly inside PostgreSQL.
+
+#### File storage
+
+Implement a storage abstraction supporting:
+
+- S3-compatible object storage.
+- MinIO or another compatible self-hosted implementation.
+- Local filesystem storage for development.
+- Network-backed storage through the object-storage service.
+
+Files must be content-addressed using SHA-256.
+
+Uploaded objects must be immutable once committed.
+
+#### Frontend
+
+Use a modern TypeScript frontend with React or another well-supported framework for the PDM web portal.
+
+The CAD application itself must retain its existing Rust/egui architecture.
+
+Do not rewrite the SolveCraft desktop interface.
+
+#### Deployment
+
+Provide:
+
+- Dockerfiles.
+- Docker Compose.
+- Docker Swarm-compatible deployment examples.
+- Environment-based configuration.
+- Health and readiness endpoints.
+- Database migration tooling.
+- Persistent volume definitions.
+- Backup and restore scripts.
+- TLS reverse-proxy examples.
+
+All services must be deployable independently of the engineer's workstation.
+
+---
+
+### 4. System Components
+
+Implement the following logical components.
+
+#### A. PDM API Service
+
+Responsible for:
+
+- Authentication.
+- Authorization.
+- Projects.
+- File records.
+- File versions.
+- Revisions.
+- Checkouts and locks.
+- Search.
+- Metadata.
+- Assembly relationships.
+- BOM management.
+- Lifecycle workflows.
+- Change management.
+- Audit history.
+
+Start with a modular monolith, not dozens of microservices.
+
+Define clear internal module boundaries so components can be separated later if necessary.
+
+#### B. Storage Service
+
+Responsible for:
+
+- Binary upload/download.
+- Multipart uploads.
+- SHA-256 verification.
+- Object deduplication.
+- Immutable file content.
+- Retention policies.
+- Storage integrity checking.
+- Recovery and garbage collection.
+
+#### C. Background Worker Service
+
+Responsible for:
+
+- CAD file analysis.
+- Metadata extraction.
+- STEP export.
+- STL export.
+- Preview rendering.
+- Thumbnail generation.
+- Geometry measurements.
+- BOM extraction.
+- Search indexing.
+- ERP synchronization.
+- Failed-job retries.
+
+Use durable jobs with idempotent execution, bounded concurrency, retries, and dead-letter handling.
+
+#### D. Web Portal
+
+Responsible for:
+
+- Project browsing.
+- File browsing.
+- Search.
+- Revision history.
+- BOM visualization.
+- Workflow approvals.
+- User administration.
+- Engineering changes.
+- Audit history.
+- Browser previews.
+
+#### E. SolveCraft PDM Client
+
+Responsible for:
+
+- Login and server selection.
+- Project navigation.
+- Open from vault.
+- Save to vault.
+- Check-in and checkout.
+- Lock status.
+- Revision history.
+- Local workspace management.
+- Reference resolution.
+- Offline operation.
+- Synchronization.
+
+#### F. ERP Connector
+
+Responsible for mapping released engineering information to Odoo without giving Odoo ownership of CAD revision history.
+
+---
+
+### 5. Core Data Model
+
+Design the database with explicit separation between identity, file content, working versions, released revisions, and relationships.
+
+Minimum entities:
+
+**Organizations and users**
+- organizations
+- users
+- groups
+- roles
+- permissions
+- memberships
+- service_accounts
+- api_tokens
+
+**Projects and files**
+- projects
+- folders
+- items
+- files
+- file_versions
+- file_blobs
+- file_revisions
+- file_metadata
+- file_references
+- file_associations
+- file_locks
+- workspaces
+
+**Engineering**
+- parts
+- part_revisions
+- assemblies
+- assembly_occurrences
+- bom_headers
+- bom_lines
+- materials
+- units_of_measure
+- properties
+- classifications
+
+**Workflow**
+- lifecycle_definitions
+- lifecycle_states
+- lifecycle_transitions
+- approval_requests
+- approval_decisions
+- change_requests
+- change_orders
+- change_affected_items
+- change_notices
+
+**Operations**
+- jobs
+- job_attempts
+- generated_artifacts
+- audit_events
+- integration_outbox
+- integration_mappings
+- sync_status
+
+Use database migrations from the beginning.
+
+Never use filenames as permanent identifiers.
+
+Every document, part, assembly, and revision must have a stable internal identity.
+
+Enforce organization boundaries on every query and object-storage operation.
+
+---
+
+### 6. File Versioning and Revision Management
+
+Implement two distinct concepts.
+
+#### File versions
+
+A new file version is created whenever an engineer successfully checks in modified content.
+
+Example:
+
+- Version 1
+- Version 2
+- Version 3
+- Version 4
+
+Every committed version is immutable.
+
+Each version records:
+
+- Unique identifier.
+- Parent version or lineage.
+- Author.
+- Timestamp.
+- Commit message.
+- Content hash.
+- File size.
+- Native file format version.
+- Associated dependencies.
+- Extracted metadata.
+
+#### Engineering revisions
+
+Engineering revisions represent controlled design releases.
+
+Example:
+
+- Revision A
+- Revision B
+- Revision C
+
+Multiple working file versions may exist before a revision is released.
+
+Released revisions must reference immutable, approved file versions.
+
+Support configurable revision schemes, including alphabetic and numeric schemes.
+
+Never silently replace or mutate a released revision.
+
+Allow previous versions to be retrieved and restored by creating a new working version.
+
+Implement revision comparisons, initially for metadata, file references, BOMs, and geometry measurements.
+
+Later extend comparisons to graphical model differences.
+
+---
+
+### 7. Checkout, Check-in, and Locking
+
+Implement exclusive checkout as the default policy for native CAD files.
+
+Required operations:
+
+- Checkout.
+- Check-in.
+- Undo checkout.
+- Refresh local copy.
+- Get latest.
+- View lock owner.
+- Request lock release.
+- Administrative lock override.
+
+Checkout must record:
+
+- User.
+- Workstation.
+- File.
+- Base version.
+- Checkout time.
+- Lease or lock status.
+
+Use atomic server-side operations to prevent simultaneous conflicting checkouts.
+
+A check-in must verify:
+
+1. User permissions.
+2. Valid checkout ownership.
+3. Expected base version.
+4. File integrity.
+5. Dependency validity.
+6. Required metadata.
+7. Workflow restrictions.
+
+Do not allow a stale client to overwrite newer server content.
+
+Support configurable lock leases and recovery from crashed clients.
+
+Offline edits must remain local until synchronization. If the server version has changed, detect the conflict and require an explicit resolution.
+
+---
+
+### 8. Native SolveCraft Integration
+
+Modify SolveCraft through well-defined interfaces.
+
+Add a PDM workspace or panel with:
+
+- Vault server selection.
+- Authentication status.
+- Project browser.
+- File browser.
+- Checkout status.
+- Version information.
+- Revision information.
+- Local modification status.
+- Check-in/check-out commands.
+- Refresh and synchronization actions.
+
+Add CAD commands such as:
+
+- `pdm.login`
+- `pdm.open`
+- `pdm.checkout`
+- `pdm.checkin`
+- `pdm.get_latest`
+- `pdm.undo_checkout`
+- `pdm.history`
+- `pdm.references`
+- `pdm.bom`
+- `pdm.properties`
+- `pdm.release`
+
+Use the existing SolveCraft command architecture where practical.
+
+The application must continue supporting ordinary local files without requiring a PDM server.
+
+Implement a clear local-file mode and managed-vault mode.
+
+Do not embed server credentials inside `.solvecraft` documents.
+
+Store authentication secrets in an appropriate OS credential store.
+
+---
+
+### 9. CAD File References and Assemblies
+
+This is a critical architectural requirement.
+
+Implement stable references between parts and assemblies.
+
+Each reference must contain:
+
+- Referenced document identity.
+- Referenced version or revision policy.
+- Component identity.
+- Occurrence identity.
+- Assembly transform.
+- Suppression state.
+- Quantity or occurrence count.
+- Resolution status.
+
+Support:
+
+- Parts used in multiple assemblies.
+- Nested subassemblies.
+- Repeated components.
+- Missing-reference detection.
+- Circular-reference detection.
+- Reference replacement.
+- Reference update.
+- Where-used searches.
+- Dependency graphs.
+- Recursive BOM generation.
+
+Do not rely on absolute filesystem paths for managed references.
+
+Introduce a vault URI scheme, such as:
+
+`pdm://organization/project/document-id`
+
+Keep the stable identity separate from the requested version or revision.
+
+Define how floating references are resolved and frozen into immutable release manifests.
+
+When opening a managed assembly, resolve all required references consistently.
+
+If SolveCraft lacks a required native assembly capability, implement the necessary CAD-side foundation before claiming full assembly support.
+
+---
+
+### 10. Part Numbering and Engineering Metadata
+
+Implement configurable part numbering.
+
+Examples:
+
+- BE-000001
+- BE-000002
+- ASM-000001
+- MFG-000001
+
+Support automatic numbering sequences per organization and classification.
+
+Required properties include:
+
+- Part number.
+- Description.
+- Revision.
+- Material.
+- Finish.
+- Weight.
+- Volume.
+- Density.
+- Manufacturer.
+- Manufacturer part number.
+- Supplier.
+- Make/buy classification.
+- Lifecycle state.
+- Project.
+- Owner.
+- Created date.
+- Last modified date.
+
+Allow custom properties with typed schemas.
+
+Support text, number, boolean, date, enum, units, and references.
+
+Implement metadata inheritance and configurable validation rules.
+
+CAD-computed properties such as volume and mass must distinguish measured values from manually entered values.
+
+Mass calculations require a valid material density.
+
+---
+
+### 11. Engineering Bill of Materials
+
+Implement an EBOM engine.
+
+Required functionality:
+
+- Recursive assembly traversal.
+- Component quantities.
+- Subassembly expansion.
+- Indented BOM.
+- Flattened BOM.
+- Purchased-part classification.
+- Manufactured-part classification.
+- Phantom assemblies.
+- Reference-only components.
+- Suppressed components.
+- Unit handling.
+- Revision-specific BOMs.
+- BOM comparisons.
+- CSV and JSON export.
+
+Support BOM snapshots associated with released assembly revisions.
+
+A released BOM must never change merely because a child component receives a newer revision.
+
+Define and test precise quantity aggregation rules.
+
+Support later conversion to a manufacturing BOM (MBOM), without assuming that EBOM and MBOM are identical.
+
+---
+
+### 12. Lifecycle Management
+
+Implement configurable lifecycle workflows.
+
+Default states:
+
+`Work in Progress → In Review → Approved → Released → Obsolete`
+
+Support additional states and organization-specific transitions.
+
+Lifecycle transitions must enforce:
+
+- Role permissions.
+- Required properties.
+- Required approvals.
+- Valid reference resolution.
+- Required generated artifacts.
+- BOM validation.
+- Revision assignment.
+- Audit recording.
+
+Released content must be immutable.
+
+A change to a released design must create a new working lineage and eventually a new revision.
+
+Prevent unapproved or obsolete components from entering a released assembly unless explicitly permitted by policy.
+
+---
+
+### 13. Engineering Change Management
+
+Implement:
+
+- Engineering Change Request (ECR).
+- Engineering Change Order (ECO).
+- Engineering Change Notice (ECN).
+
+An ECR describes the proposed change.
+
+An ECO controls implementation, affected items, approvals, and release.
+
+An ECN records communication of the approved change.
+
+Track:
+
+- Change number.
+- Title.
+- Description.
+- Reason.
+- Requester.
+- Assigned engineers.
+- Affected parts.
+- Previous revisions.
+- Proposed revisions.
+- Impacted assemblies.
+- BOM changes.
+- Reviewers.
+- Approvals.
+- Effective date.
+- Status.
+- Attached documents.
+
+Use immutable audit events for approvals and releases.
+
+A change order must be able to release multiple related items consistently.
+
+Do not expose partially completed multi-item releases as successful.
+
+---
+
+### 14. Search and Where-Used
+
+Implement search across:
+
+- Part numbers.
+- Descriptions.
+- Filenames.
+- Projects.
+- Metadata.
+- Materials.
+- Authors.
+- Revisions.
+- Lifecycle states.
+- Change orders.
+- Assembly relationships.
+
+Use PostgreSQL full-text search initially.
+
+Add indexes appropriate to common searches.
+
+Provide exact-match, prefix, full-text, and filtered search.
+
+Implement both:
+
+- **Where used:** Find every assembly referencing a component.
+- **Uses:** Find all components required by an assembly.
+
+Support direct and recursive results.
+
+Include revision context so engineers can distinguish current working dependencies from historical released dependencies.
+
+---
+
+### 15. File Preview and Visualization
+
+Generate previews through background workers.
+
+Supported initial outputs:
+
+- PNG thumbnails.
+- Geometry statistics.
+- STEP export.
+- STL export.
+- OBJ or 3MF export where supported.
+
+Use SolveCraft's existing headless CLI and rendering capabilities wherever possible.
+
+The browser portal must support interactive model viewing when a suitable model representation is available.
+
+Do not assume the current browser application already implements a complete PDM model viewer.
+
+Add preview caching keyed by file version and rendering parameters.
+
+Provide clear error reporting for unsupported or failed conversions.
+
+Later capabilities:
+
+- Model comparison.
+- Section views.
+- Measurement tools.
+- Exploded assemblies.
+- Drawing previews.
+- Markups and annotations.
+
+---
+
+### 16. Drawings and Manufacturing Documents
+
+Implement document association before attempting a full drawing subsystem.
+
+Allow linking:
+
+- Native CAD models.
+- STEP files.
+- PDFs.
+- DXF files.
+- Manufacturing drawings.
+- Specifications.
+- Inspection documents.
+- Supplier documentation.
+
+Maintain revision relationships between models and drawings.
+
+Where native drawing generation is not yet available in SolveCraft, mark it as a dependency rather than inventing unsupported commands.
+
+Plan future support for:
+
+- 2D drawing sheets.
+- Orthographic views.
+- Section views.
+- Dimensions.
+- Tolerances.
+- Title blocks.
+- Revision tables.
+- PDF generation.
+- DXF export.
+
+---
+
+### 17. Odoo ERP Integration
+
+Build an independent Odoo connector.
+
+Target Odoo 18 initially, with version-specific adapters.
+
+Use documented Odoo APIs and verified model capabilities.
+
+The PDM is the authoritative source for:
+
+- Engineering part identity.
+- CAD documents.
+- Engineering revisions.
+- Engineering BOMs.
+- Engineering approval status.
+
+Odoo is authoritative for:
+
+- Inventory quantities.
+- Purchasing.
+- Suppliers and pricing.
+- Manufacturing execution.
+- Warehouse operations.
+- Accounting.
+
+Implement configurable mappings for:
+
+- Engineering parts to `product.template` and `product.product`.
+- Released EBOMs to manufacturing BOM records where appropriate.
+- Material and unit mappings.
+- Engineering revision identifiers.
+- Engineering change references.
+- Released drawing and STEP attachments.
+
+Do not automatically overwrite active manufacturing BOMs when engineering changes are released.
+
+Support explicit release-to-ERP approval or publication policies.
+
+Implement:
+
+- Idempotent synchronization.
+- Durable outbound event queues.
+- Retry handling.
+- Mapping records.
+- Conflict detection.
+- Sync status reporting.
+- Reconciliation tools.
+
+Never use product names as unique synchronization keys.
+
+---
+
+### 18. AI and MCP Integration
+
+Expose a dedicated PDM MCP interface.
+
+The AI agent must be able to:
+
+- Search for parts.
+- Find assemblies.
+- Inspect metadata.
+- Retrieve revision history.
+- Inspect BOMs.
+- Find where-used relationships.
+- Compare revisions.
+- Create draft parts.
+- Create draft engineering changes.
+- Request CAD previews.
+- Request exports.
+- Analyze dependency graphs.
+
+Proposed tools:
+
+- `pdm_search`
+- `pdm_get_item`
+- `pdm_get_file_history`
+- `pdm_get_bom`
+- `pdm_where_used`
+- `pdm_compare_revisions`
+- `pdm_create_draft`
+- `pdm_create_change_request`
+- `pdm_request_export`
+- `pdm_get_job_status`
+
+Reuse SolveCraft's existing MCP capabilities for CAD operations.
+
+All MCP actions must execute with the permissions of an authenticated identity.
+
+Require explicit authorization for check-ins, releases, approvals, deletions, and ERP publication.
+
+AI agents must not bypass lifecycle approval rules.
+
+Log AI-initiated modifications and identify the responsible agent and requesting user.
+
+---
+
+### 19. Offline Workspaces
+
+Implement a local workspace manager.
+
+Required behavior:
+
+- Download selected projects and dependencies.
+- Cache files locally.
+- Track server versions.
+- Detect local modifications.
+- Preserve unsynchronized changes.
+- Resume interrupted transfers.
+- Verify content hashes.
+- Detect stale versions.
+- Synchronize when reconnected.
+
+Never silently overwrite local edits.
+
+The client must be able to open previously cached files without network connectivity.
+
+Server-controlled release operations require an active connection.
+
+---
+
+### 20. Security Requirements
+
+Implement security from the beginning.
+
+Required controls:
+
+- TLS for network traffic.
+- OIDC authentication.
+- Role-based access control.
+- Organization isolation.
+- Project-level permissions.
+- Object-level authorization.
+- Short-lived access tokens.
+- Credential rotation.
+- Rate limiting.
+- Upload size limits.
+- Input validation.
+- Path traversal protection.
+- Secure archive handling.
+- Content hash validation.
+- Audit logging.
+- Backup encryption support.
+
+Do not trust file IDs, project IDs, or object-storage keys supplied by clients without authorization checks.
+
+Avoid storing credentials in source code, container images, or configuration files committed to Git.
+
+Document the security threat model.
+
+---
+
+### 21. Reliability and Backup
+
+Provide automated backup and recovery procedures.
+
+Backups must include:
+
+- PostgreSQL.
+- Object storage.
+- Application configuration.
+- Workflow definitions.
+- Required encryption keys and secrets, handled securely.
+
+Ensure database metadata and stored objects can be restored to a consistent point.
+
+Implement:
+
+- Storage integrity verification.
+- Orphan detection.
+- Retention-aware garbage collection.
+- Migration rollback or recovery procedures.
+- Restore validation.
+- Disaster recovery documentation.
+
+Object deletion must respect released revision retention policies.
+
+---
+
+### 22. Performance and Scalability
+
+The architecture must support:
+
+- Multiple simultaneous engineers.
+- Large CAD assemblies.
+- Hundreds of thousands of managed files.
+- Millions of historical file versions over time.
+- Parallel export and rendering workers.
+- High-speed local network storage.
+- Distributed deployment.
+
+These are scalability targets, not claims of proven performance.
+
+Create benchmarks measuring:
+
+- File upload throughput.
+- File download throughput.
+- Metadata search latency.
+- Checkout contention.
+- Recursive BOM generation.
+- Assembly reference resolution.
+- Concurrent check-ins.
+- Worker throughput.
+- Database query performance.
+
+Avoid loading entire CAD binaries into memory for basic file-management operations.
+
+Support streaming and multipart transfers.
+
+---
+
+### 23. Deployment Architecture
+
+Provide a development Compose configuration and a production-oriented configuration.
+
+Initial containers:
+
+- `pdm-api`
+- `pdm-worker`
+- `pdm-web`
+- `postgres`
+- `object-storage`
+
+Add dedicated messaging infrastructure only when durable PostgreSQL-backed jobs and events no longer meet requirements.
+
+Support an external PostgreSQL server and external S3-compatible storage.
+
+Use stateless API instances wherever possible.
+
+Document Docker Swarm deployment, persistent storage placement, network configuration, and service discovery.
+
+Do not claim high availability merely because multiple containers are running.
+
+Document the additional requirements for PostgreSQL failover, storage redundancy, and reverse-proxy availability.
+
+---
+
+### 24. Testing Requirements
+
+Every implementation phase requires automated tests.
+
+Minimum categories:
+
+**Unit tests**
+- Version creation.
+- Revision assignment.
+- BOM calculations.
+- Permission evaluation.
+- Workflow transitions.
+- Metadata validation.
+
+**Integration tests**
+- PostgreSQL operations.
+- Object-storage transactions.
+- Checkout/check-in.
+- Authentication.
+- ERP synchronization.
+- Background jobs.
+
+**Concurrency tests**
+- Two users checking out the same file.
+- Simultaneous check-ins.
+- Interrupted uploads.
+- Expired lock recovery.
+- Concurrent release requests.
+
+**CAD integration tests**
+- Open managed design.
+- Modify design.
+- Check in.
+- Retrieve earlier version.
+- Resolve assembly references.
+- Generate STEP.
+- Verify geometry and metadata.
+
+**Recovery tests**
+- Database restoration.
+- Object integrity.
+- Failed worker recovery.
+- Interrupted synchronization.
+- Partial deployment failures.
+
+Use existing SolveCraft regression tests to detect unintended CAD behavior changes.
+
+---
+
+### 25. Development Phases
+
+#### Phase 0 — Discovery and architecture
+
+- Audit SolveCraft.
+- Identify integration boundaries.
+- Define database model.
+- Define API contracts.
+- Define storage strategy.
+- Document assembly limitations.
+- Create development environment.
+
+Deliverable: approved architecture and working development environment.
+
+#### Phase 1 — Minimum functional vault
+
+- Authentication.
+- Projects and folders.
+- File upload/download.
+- Immutable versions.
+- Metadata.
+- Search.
+- Web file browser.
+- Audit events.
+
+Deliverable: multiple users can store and retrieve versioned engineering files.
+
+#### Phase 2 — Native CAD integration
+
+- SolveCraft PDM client.
+- Open from vault.
+- Save to vault.
+- Check-in/check-out.
+- Version history.
+- Local workspace.
+- Lock handling.
+
+Deliverable: a user can manage native SolveCraft documents without manually uploading files.
+
+#### Phase 3 — Assemblies and dependencies
+
+- Stable reference identities.
+- Dependency graph.
+- Reference resolution.
+- Nested assemblies.
+- Where-used.
+- Missing-reference reporting.
+- EBOM generation.
+
+Deliverable: managed assemblies remain reproducible and their dependencies are traceable.
+
+#### Phase 4 — Engineering release control
+
+- Revisions.
+- Lifecycle workflows.
+- Approvals.
+- Release manifests.
+- ECR/ECO/ECN.
+- Revision comparison.
+
+Deliverable: engineering teams can formally approve and release designs.
+
+#### Phase 5 — Automation and ERP
+
+- Export workers.
+- Preview generation.
+- Odoo connector.
+- ERP publication workflow.
+- Integration reconciliation.
+- MCP PDM tools.
+
+Deliverable: approved engineering information can flow into manufacturing systems.
+
+#### Phase 6 — Advanced capabilities
+
+- Offline synchronization.
+- Advanced assembly management.
+- Browser model comparisons.
+- Drawing integration.
+- Advanced reporting.
+- Performance optimization.
+- Distributed deployment validation.
+
+Deliverable: production-hardening and advanced engineering workflows.
+
+---
+
+### 26. Multi-Agent Development Structure
+
+Use specialized coding agents with clearly separated ownership.
+
+**Agent 1 — Technical Architect**
+Owns architecture, API contracts, shared interfaces, dependency rules, and design decisions.
+
+**Agent 2 — Database Engineer**
+Owns PostgreSQL schema, migrations, indexing, transactions, and integrity constraints.
+
+**Agent 3 — Backend Engineer**
+Owns Rust API modules, authentication, permissions, workflows, and audit events.
+
+**Agent 4 — Storage Engineer**
+Owns immutable blobs, uploads, downloads, integrity verification, and retention.
+
+**Agent 5 — CAD Integration Engineer**
+Owns SolveCraft integration, native commands, document identity, and workspace support.
+
+**Agent 6 — Assembly/BOM Engineer**
+Owns reference graphs, assembly occurrences, BOM generation, and where-used logic.
+
+**Agent 7 — Frontend Engineer**
+Owns the web portal, administration, file browser, search, and workflow UI.
+
+**Agent 8 — Integration Engineer**
+Owns Odoo synchronization, MCP, background workers, and external API integrations.
+
+**Agent 9 — QA/DevOps Engineer**
+Owns CI, containers, integration tests, performance tests, and recovery validation.
+
+Agents must not independently modify shared contracts without architect review.
+
+Use small, reviewable changes with tests.
+
+Parallelize independent modules, not tightly coupled database and API changes.
+
+---
+
+### 27. Development Rules
+
+1. Do not rewrite SolveCraft from scratch.
+2. Do not remove existing CAD functionality.
+3. Preserve compatibility with unmanaged local files.
+4. Use Rust for core backend services.
+5. Prefer simple, testable architecture.
+6. Avoid unnecessary microservices.
+7. Never overwrite immutable versions.
+8. Never bypass authorization checks.
+9. Never assume a CAD feature exists without verifying it.
+10. Maintain database migrations.
+11. Maintain automated tests.
+12. Document architectural decisions.
+13. Implement structured error handling.
+14. Use explicit transactions for critical operations.
+15. Keep business rules outside UI code.
+16. Keep integration adapters separate from core domain logic.
+17. Avoid introducing unreviewed licensing dependencies.
+18. Maintain a working build after every phase.
+19. Track incomplete features explicitly.
+20. Never report a feature as complete without passing its acceptance tests.
+
+---
+
+### 28. First Assignment
+
+Begin with Phase 0.
+
+Inspect the existing repository and create the five architecture documents specified above.
+
+Then:
+
+1. Identify the exact integration points in SolveCraft.
+2. Propose the initial Rust workspace structure.
+3. Design the initial PostgreSQL schema.
+4. Define API contracts for files, versions, and checkouts.
+5. Design the object-storage transaction model.
+6. Identify native assembly limitations.
+7. Define the first end-to-end acceptance test.
+8. Create a dependency-ordered implementation backlog.
+9. Assign work to appropriate subagents.
+10. Begin Phase 1 only after the architecture is internally consistent.
+
+The first end-to-end milestone must demonstrate:
+
+- Two authenticated users.
+- One shared engineering project.
+- Upload of a `.solvecraft` design.
+- Creation of immutable file versions.
+- Exclusive checkout.
+- Successful check-in.
+- Retrieval of a previous version.
+- Audit history.
+- Verified file integrity after download.
+
+Do not build the entire product in a single pass.
+
+Prioritize a reliable, working PDM foundation that can evolve into a complete engineering data management platform.
